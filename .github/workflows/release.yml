@@ -253,10 +253,21 @@ jobs:
       #   macOS:         evermeet.cx — individual .zip per binary (x86_64,
       #                  runs fine on Apple Silicon via Rosetta 2)
       #   Linux/Windows: BtbN/FFmpeg-Builds — single archive with both bins
+      # Pinned BtbN/FFmpeg-Builds version for Linux + Windows ffmpeg
+      # bundling. The string appears *twice* in each URL (once as the
+      # release tag, once inside the archive filename) — BtbN tags their
+      # autobuilds `autobuild-YYYY-MM-DD-HH-MM` and the inner filenames
+      # use the same datestamp. Driving both from one variable means a
+      # maintainer pin is a one-line edit: change `latest` to a specific
+      # autobuild tag (https://github.com/BtbN/FFmpeg-Builds/releases) to
+      # get reproducible installer builds. Same constant lives in
+      # frontend/src-tauri/src/tools.rs:FFMPEG_BTBN_VERSION — bump
+      # together.
       - name: Bundle ffmpeg + ffprobe (${{ matrix.rust_target }})
         shell: bash
         env:
           TRIPLE: ${{ matrix.rust_target }}
+          FFMPEG_BTBN_VERSION: "latest"
         run: |
           set -euo pipefail
           BINDIR="frontend/src-tauri/binaries"
@@ -281,8 +292,8 @@ jobs:
               done
               ;;
             x86_64-unknown-linux-gnu)
-              URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
-              echo "Fetching ffmpeg from BtbN (linux64)"
+              URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/${FFMPEG_BTBN_VERSION}/ffmpeg-master-${FFMPEG_BTBN_VERSION}-linux64-gpl.tar.xz"
+              echo "Fetching ffmpeg from BtbN (linux64) — version=${FFMPEG_BTBN_VERSION}"
               curl -fsSL "$URL" -o "$WORK/ffmpeg.tar.xz"
               tar -xJf "$WORK/ffmpeg.tar.xz" -C "$WORK"
               # Archive extracts to ffmpeg-master-latest-linux64-gpl/bin/
@@ -292,8 +303,8 @@ jobs:
               chmod +x "$BINDIR/ffmpeg-${TRIPLE}" "$BINDIR/ffprobe-${TRIPLE}"
               ;;
             x86_64-pc-windows-msvc)
-              URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-              echo "Fetching ffmpeg from BtbN (win64)"
+              URL="https://github.com/BtbN/FFmpeg-Builds/releases/download/${FFMPEG_BTBN_VERSION}/ffmpeg-master-${FFMPEG_BTBN_VERSION}-win64-gpl.zip"
+              echo "Fetching ffmpeg from BtbN (win64) — version=${FFMPEG_BTBN_VERSION}"
               curl -fsSL "$URL" -o "$WORK/ffmpeg.zip"
               unzip -o "$WORK/ffmpeg.zip" -d "$WORK"
               EXTRACTED=$(find "$WORK" -type f -name "ffmpeg.exe" | head -1)

@@ -86,6 +86,35 @@ class TTSBackend(ABC):
         Engines that don't support this will ignore the parameter.
         """
 
+    # ── Lifecycle (Phase 2 will enforce per-engine overrides) ──────────────
+    #
+    # Today every backend lazily loads its weights on first `generate()` and
+    # keeps them in VRAM for the lifetime of the process. Switching engines
+    # in Settings therefore leaks the old engine's allocations until the
+    # next process restart — measurable on multi-engine sessions on 8 GB
+    # MPS Macs.
+    #
+    # `unload()` is the contract that lets the registry release an engine
+    # before instantiating the next one. It is a default no-op on the ABC
+    # so this commit does not break any of the 9 existing subclasses; Phase
+    # 2 (engine isolation) overrides it per-engine and adds a CI gate that
+    # fails when a subclass doesn't implement it.
+    #
+    # Contract for overriders:
+    #   • Idempotent: calling unload() twice must not raise.
+    #   • Synchronous: returns after VRAM is freed (or after best-effort
+    #     `torch.cuda.empty_cache()` / `torch.mps.empty_cache()`).
+    #   • Safe to call before the first generate(): a backend that never
+    #     loaded has nothing to release.
+    def unload(self) -> None:
+        """Release any GPU memory and file handles held by this backend.
+
+        Called by the registry on engine switch and on app shutdown. Default
+        is a no-op so engines that haven't migrated keep working; per-engine
+        overrides arrive in Phase 2 (see ROADMAP.md). Must be idempotent.
+        """
+        return None
+
 
 # ── OmniVoice adapter (the current default) ─────────────────────────────────
 
